@@ -39,6 +39,8 @@ $img = $imgs_array[$id];
  */
 function checkReferer($domain_list = array(
     'marxchou.com',
+    'localhost',
+    '127.0.0.1',
     'mch.icu'
 )) {
     $status = false;
