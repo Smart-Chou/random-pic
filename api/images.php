@@ -41,7 +41,7 @@ function checkReferer($domain_list = array(
     'marxchou.com',
     'localhost',
     '127.0.0.1',
-    'mch.icu'
+    'mcc.im'
 )) {
     $status = false;
     $refer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : ''; //前一URL

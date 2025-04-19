@@ -1,3 +1,5 @@
 .vercel
 
 .env.example
+
+.DS_Store
