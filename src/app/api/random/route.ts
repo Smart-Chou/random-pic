@@ -12,11 +12,7 @@ export async function GET(request: NextRequest) {
     // Referer validation (skip for background image requests)
     const referer = request.headers.get('referer') || request.headers.get('origin')
     const isBgRequest = searchParams.get('bg') === 'true'
-    const refererWhitelist = (
-      process.env.REFERER_WHITELIST || 'marxchou.com,localhost,127.0.0.1,mcc.im'
-    )
-      .split(',')
-      .map((d) => d.trim())
+    const refererWhitelist = (process.env.REFERER_WHITELIST || '').split(',').map((d) => d.trim())
     if (!isBgRequest && referer && refererWhitelist.length > 0) {
       const isAllowed = refererWhitelist.some(
         (domain) => referer.includes(domain) || domain === '*'

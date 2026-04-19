@@ -21,7 +21,8 @@
       "bucket_name": "pic",
     },
   ],
-  "triggers": {
-    "cron": ["0 0 * * *"],
-  },
+  // "triggers": {
+  //   "crons": ["0 0 * * *"],
+  // },
+  // Note: crons config is used for scheduled workers (Workers Cron Triggers)
 }

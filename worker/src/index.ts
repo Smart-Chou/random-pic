@@ -50,7 +50,7 @@ export default {
   },
 } satisfies ExportedHandler<Env>
 
-interface Env {
+export interface Env {
   R2: R2Bucket
   IMAGES: KVNamespace
   ASSETS: Fetcher

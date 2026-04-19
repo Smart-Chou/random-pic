@@ -38,7 +38,7 @@ export interface RandomImageOptions {
 export async function getRandomImage(
   options: RandomImageOptions = {}
 ): Promise<ImageWithMeta | null> {
-  const {category, strategy = 'weighted'} = options
+  const {category} = options
 
   let images: ImageWithMeta[]
 
