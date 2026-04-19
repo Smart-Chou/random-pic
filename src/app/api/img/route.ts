@@ -40,7 +40,13 @@ export async function GET(request: NextRequest) {
     }
 
     // 代理模式：流式转发图片内容
-    const response = await fetch(imageUrl);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch(imageUrl, { signal: controller.signal }).finally(() => {
+      clearTimeout(timeoutId);
+    });
+
     if (!response.ok) {
       return new NextResponse('Image not available', { status: 502 });
     }

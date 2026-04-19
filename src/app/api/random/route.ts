@@ -69,7 +69,19 @@ export async function GET(request: NextRequest) {
 
     // 代理模式：从 R2 获取图片并转发给用户
     // 地址栏保持为当前域名，不显示任何 URL
-    const r2Response = await fetch(imageUrl);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    let r2Response;
+    try {
+      r2Response = await fetch(imageUrl, { signal: controller.signal });
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error('R2 fetch error, falling back to redirect:', fetchError);
+      // 代理失败时回退到重定向模式
+      return NextResponse.redirect(imageUrl, 302);
+    }
+    clearTimeout(timeoutId);
 
     if (!r2Response.ok) {
       console.error('R2 fetch failed:', r2Response.status, imageUrl);
