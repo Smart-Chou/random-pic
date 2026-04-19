@@ -8,6 +8,16 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  // Configure Vercel Image Optimization to proxy external images
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'pic-api.marxchou.com',
+        pathname: '/**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

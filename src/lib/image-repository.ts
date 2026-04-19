@@ -1,8 +1,9 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { validateImagesData } from './validators';
-import { config } from './config';
 import type { ImageWithMeta } from '@/types/image';
+
+const DATA_FILE_PATH = 'data/images.json';
 
 /**
  * Image Repository - 数据读取模块
@@ -25,7 +26,7 @@ export async function loadImages(): Promise<ImageWithMeta[]> {
     return cachedImages.data;
   }
 
-  const filePath = join(process.cwd(), config.dataFilePath);
+  const filePath = join(process.cwd(), DATA_FILE_PATH);
   const content = await readFile(filePath, 'utf-8');
   const rawData = JSON.parse(content);
 

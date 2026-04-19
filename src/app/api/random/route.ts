@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRandomImage, getCategories } from '@/lib/image-service';
-import { config } from '@/lib/config';
 import {
   AppError,
   categoryNotFound,
-  noAvailableImages,
   forbidden,
 } from '@/lib/errors';
+
+// R2 自定义域名，用于代理获取图片
+const R2_BASE_URL = process.env.IMAGE_BASE_URL || '';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,8 +16,11 @@ export async function GET(request: NextRequest) {
     // Referer 验证（跳过背景图请求）
     const referer = request.headers.get('referer') || request.headers.get('origin');
     const isBgRequest = searchParams.get('bg') === 'true';
-    if (!isBgRequest && referer && config.refererWhitelist.length > 0) {
-      const isAllowed = config.refererWhitelist.some(
+    const refererWhitelist = (process.env.REFERER_WHITELIST || 'marxchou.com,localhost,127.0.0.1,mcc.im')
+      .split(',')
+      .map(d => d.trim());
+    if (!isBgRequest && referer && refererWhitelist.length > 0) {
+      const isAllowed = refererWhitelist.some(
         (domain) => referer.includes(domain) || domain === '*'
       );
       if (!isAllowed) {
@@ -39,7 +43,7 @@ export async function GET(request: NextRequest) {
     const image = await getRandomImage({ category });
 
     if (!image) {
-      // Return nico.gif as fallback
+      // 查找备用图片
       return NextResponse.redirect('/nico.gif', 302);
     }
 
@@ -56,24 +60,42 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Default: redirect to image URL
-    // 处理相对路径：当前CSV中是相对路径如 /images/landscape/webp/xxx.webp
-    // 需要拼接 baseUrl（预留扩展点）
+    // 构建 R2 URL
     let imageUrl = image.url;
     if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-      // 如果没有配置 baseUrl，使用相对路径
-      if (!config.baseUrl) {
-        // 保持相对路径，让 Next.js 处理
-      } else {
-        // 添加 https:// 前缀如果缺少协议
-        const baseUrl = config.baseUrl.startsWith('http')
-          ? config.baseUrl
-          : `https://${config.baseUrl}`;
-        imageUrl = baseUrl + imageUrl;
-      }
+      const baseUrl = R2_BASE_URL.startsWith('http') ? R2_BASE_URL : `https://${R2_BASE_URL}`;
+      imageUrl = `${baseUrl}${imageUrl}`;
     }
 
-    return NextResponse.redirect(imageUrl, config.api.redirectStatusCode);
+    // 代理模式：从 R2 获取图片并转发给用户
+    // 地址栏保持为当前域名，不显示任何 URL
+    const r2Response = await fetch(imageUrl);
+
+    if (!r2Response.ok) {
+      console.error('R2 fetch failed:', r2Response.status, imageUrl);
+      return new NextResponse('Image not found', { status: 404 });
+    }
+
+    const headers = new Headers();
+    const contentType = r2Response.headers.get('content-type');
+    const contentLength = r2Response.headers.get('content-length');
+    const cacheControl = r2Response.headers.get('cache-control');
+
+    if (contentType) headers.set('content-type', contentType);
+    if (contentLength) headers.set('content-length', contentLength);
+    if (cacheControl) headers.set('cache-control', cacheControl);
+    else headers.set('cache-control', 'public, max-age=86400');
+
+    // 流式转发图片内容
+    const body = r2Response.body;
+    if (!body) {
+      return new NextResponse('Image not found', { status: 404 });
+    }
+
+    return new NextResponse(body, {
+      status: 200,
+      headers,
+    });
   } catch (error) {
     console.error('API Error:', error);
     const errMsg = error instanceof Error ? error.message : String(error);
