@@ -1,23 +1,20 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type {Metadata} from 'next'
+import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Random Pic API - 随机图片 API',
-  description: '随机图片 API 服务 - 提供图片随机跳转、JSON 输出、分类筛选等功能',
-  keywords: 'random image api, 随机图片, 随机壁纸, wallpaper api',
+  title: 'Random Pic API',
+  description:
+    'Random image API service - provides random image redirect, JSON output, category filtering, and more',
+  keywords: 'random image api, random wallpaper, wallpaper api, image api',
   icons: {
     icon: '/favicon.ico',
   },
-};
+}
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body>{children}</body>
     </html>
-  );
+  )
 }

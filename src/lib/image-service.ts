@@ -3,58 +3,57 @@ import {
   getImagesByCategory,
   getCategories,
   getImageById,
-} from './image-repository';
-import type { ImageWithMeta } from '@/types/image';
+} from './image-repository'
+import type {ImageWithMeta} from '@/types/image'
 
 /**
- * Image Service - 随机选择模块
- * 负责图片的随机选择逻辑
- *
- * 使用权重随机选择，支持根据 weight 字段调整选中概率
+ * Image Service - Random Selection Module
+ * Handles random image selection logic with weight support
  */
 
-// Weighted random selection - 根据 weight 字段调整选中概率
-export function selectWeighted<T extends { weight: number }>(items: T[]): T | undefined {
+export function selectWeighted<T extends {weight: number}>(items: T[]): T | undefined {
   if (items.length === 0) {
-    return undefined;
+    return undefined
   }
 
-  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
-  let random = Math.random() * totalWeight;
+  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0)
+  let random = Math.random() * totalWeight
 
   for (const item of items) {
-    random -= item.weight;
+    random -= item.weight
     if (random <= 0) {
-      return item;
+      return item
     }
   }
 
-  return items[items.length - 1];
+  return items[items.length - 1]
 }
 
 export interface RandomImageOptions {
-  category?: string;
-  // 'weighted' - 使用权重随机（默认），'random' - 均匀随机
-  strategy?: 'random' | 'weighted';
+  category?: string
+  // 'weighted' - use weight-based random (default), 'random' - uniform random
+  strategy?: 'random' | 'weighted'
 }
 
-export async function getRandomImage(options: RandomImageOptions = {}): Promise<ImageWithMeta | null> {
-  const { category, strategy = 'weighted' } = options;
+export async function getRandomImage(
+  options: RandomImageOptions = {}
+): Promise<ImageWithMeta | null> {
+  const {category, strategy = 'weighted'} = options
 
-  let images: ImageWithMeta[];
+  let images: ImageWithMeta[]
 
   if (category) {
-    images = await getImagesByCategory(category);
+    images = await getImagesByCategory(category)
   } else {
-    images = await getEnabledImages();
+    images = await getEnabledImages()
   }
 
   if (images.length === 0) {
-    return null;
+    return null
   }
 
   // Default: use weighted random
-  return selectWeighted(images) ?? null;
+  return selectWeighted(images) ?? null
 }
 
-export { getCategories, getImageById };
+export {getCategories, getImageById}

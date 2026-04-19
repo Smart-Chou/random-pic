@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
-import { getCategories } from '@/lib/image-service';
+import {NextResponse} from 'next/server'
+import {getCategories} from '@/lib/image-service'
 
 export async function GET() {
   try {
-    const categories = await getCategories();
+    const categories = await getCategories()
 
     return NextResponse.json({
       success: true,
@@ -11,7 +11,7 @@ export async function GET() {
         categories,
         total: categories.length,
       },
-    });
+    })
   } catch (error) {
     return NextResponse.json(
       {
@@ -21,7 +21,7 @@ export async function GET() {
           message: error instanceof Error ? error.message : 'Internal server error',
         },
       },
-      { status: 500 }
-    );
+      {status: 500}
+    )
   }
 }

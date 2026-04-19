@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import {NextRequest, NextResponse} from 'next/server'
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const {pathname} = request.nextUrl
 
-  // 阻止直接访问 /images/* 路径（隐藏原始 URL）
+  // Block direct access to /images/* (hide original URLs)
   if (pathname.startsWith('/images/')) {
-    return new NextResponse('Forbidden', { status: 403 });
+    return new NextResponse('Forbidden', {status: 403})
   }
 
-  return NextResponse.next();
+  return NextResponse.next()
 }
 
 export const config = {
   matcher: '/:path*',
-};
+}

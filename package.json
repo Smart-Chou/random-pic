@@ -2,13 +2,27 @@
   "name": "random-pic",
   "version": "2.0.0",
   "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "dev:worker": "wrangler dev ./worker/src/index.ts",
+    "build": "pnpm build:next && pnpm build:worker",
+    "build:next": "next build",
+    "build:worker": "wrangler deploy --dry-run ./worker/src/index.ts",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "type:check": "next typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "deploy": "vercel deploy",
+    "deploy:worker": "wrangler deploy ./worker/src/index.ts",
+    "sync:kv": "pnpm tsx scripts/sync-kv.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "next": "^15.1.0",
@@ -17,14 +31,24 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250419.0",
     "@eslint/eslintrc": "^3.2.0",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.6",
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.1.0",
+    "prettier": "^3.8.3",
+    "typescript": "^5.7.3",
     "vitest": "^2.1.8",
-    "typescript": "^5.7.3"
+    "wrangler": "^4.6.2"
   },
-  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
+  "pnpm": {
+    "overrides": {
+      "node-fetch": "^3.3.2"
+    },
+    "onlyBuiltDependencies": [
+      "wrangler"
+    ]
+  }
 }

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { validateImage, validateImagesData } from '@/lib/validators';
+import {describe, it, expect} from 'vitest'
+import {validateImage, validateImagesData} from '@/lib/validators'
 
 describe('validators', () => {
   describe('validateImage', () => {
@@ -9,14 +9,14 @@ describe('validators', () => {
         url: 'https://example.com/image.jpg',
         category: 'landscape',
         enabled: true,
-      };
+      }
 
-      const result = validateImage(image);
-      expect(result.id).toBe('1');
-      expect(result.url).toBe('https://example.com/image.jpg');
-      expect(result.weight).toBe(1); // default
-      expect(result.tags).toEqual([]);
-    });
+      const result = validateImage(image)
+      expect(result.id).toBe('1')
+      expect(result.url).toBe('https://example.com/image.jpg')
+      expect(result.weight).toBe(1) // default
+      expect(result.tags).toEqual([])
+    })
 
     it('should apply defaults for optional fields', () => {
       const image = {
@@ -26,16 +26,16 @@ describe('validators', () => {
         enabled: true,
         weight: 10,
         tags: ['tag1'],
-      };
+      }
 
-      const result = validateImage(image);
-      expect(result.weight).toBe(10);
-      expect(result.tags).toEqual(['tag1']);
-    });
+      const result = validateImage(image)
+      expect(result.weight).toBe(10)
+      expect(result.tags).toEqual(['tag1'])
+    })
 
     it('should throw for missing required fields', () => {
-      expect(() => validateImage({})).toThrow();
-    });
+      expect(() => validateImage({})).toThrow()
+    })
 
     it('should throw for empty url', () => {
       expect(() =>
@@ -45,9 +45,9 @@ describe('validators', () => {
           category: 'landscape',
           enabled: true,
         })
-      ).toThrow();
-    });
-  });
+      ).toThrow()
+    })
+  })
 
   describe('validateImagesData', () => {
     it('should validate an array of images', () => {
@@ -64,14 +64,14 @@ describe('validators', () => {
           category: 'landscape',
           enabled: false,
         },
-      ];
+      ]
 
-      const result = validateImagesData(images);
-      expect(result).toHaveLength(2);
-    });
+      const result = validateImagesData(images)
+      expect(result).toHaveLength(2)
+    })
 
     it('should throw for invalid data', () => {
-      expect(() => validateImagesData([{ id: '1' }])).toThrow();
-    });
-  });
-});
+      expect(() => validateImagesData([{id: '1'}])).toThrow()
+    })
+  })
+})
