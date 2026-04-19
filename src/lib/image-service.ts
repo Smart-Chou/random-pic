@@ -11,17 +11,23 @@ import type {ImageWithMeta} from '@/types/image'
  * Handles random image selection logic with weight support
  */
 
-export function selectWeighted<T extends {weight: number}>(items: T[]): T | undefined {
+export function selectWeighted<T extends {weight: number}>(
+  items: T[],
+  seed?: number
+): T | undefined {
   if (items.length === 0) {
     return undefined
   }
 
   const totalWeight = items.reduce((sum, item) => sum + item.weight, 0)
-  let random = Math.random() * totalWeight
+  // Use provided seed or generate random base, then add time component to ensure uniqueness
+  const random = (seed ?? Math.random()) * totalWeight + Date.now() % 1000
+
+  let randomCopy = random
 
   for (const item of items) {
-    random -= item.weight
-    if (random <= 0) {
+    randomCopy -= item.weight
+    if (randomCopy <= 0) {
       return item
     }
   }
