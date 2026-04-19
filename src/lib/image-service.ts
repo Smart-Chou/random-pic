@@ -20,8 +20,7 @@ export function selectWeighted<T extends {weight: number}>(
   }
 
   const totalWeight = items.reduce((sum, item) => sum + item.weight, 0)
-  // Use provided seed or generate random base, then add time component to ensure uniqueness
-  const random = (seed ?? Math.random()) * totalWeight + Date.now() % 1000
+  const random = (seed ?? Math.random()) * totalWeight
 
   let randomCopy = random
 
