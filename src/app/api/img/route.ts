@@ -32,10 +32,41 @@ function getPreferredFormat(acceptHeader: string): string {
  * Example: /meitu/landscape/jpg/xxx.jpg -> /meitu/landscape/avif/xxx.avif
  */
 function convertImageFormat(url: string, targetFormat: string): string {
-  // Match patterns like: /meitu/xxx/jpg/filename.jpg, /meitu/xxx/webp/filename.webp
-  // Replace the directory part (jpg/webp/avif) and extension
-  const result = url.replace(/\/([wj]eb?|avif)\//i, `/${targetFormat}/`).replace(/\.(webp|jpe?g|avif)$/i, `.${targetFormat}`)
-  return result
+  // Known format directories in R2 bucket
+  const knownFormats = ['webp', 'avif', 'jpeg', 'jpg', 'png', 'gif']
+  const lastSlashIndex = url.lastIndexOf('/')
+
+  if (lastSlashIndex === -1) return url
+
+  const beforeLastSlash = url.substring(0, lastSlashIndex)
+  const lastSegment = url.substring(lastSlashIndex + 1)
+
+  // Find which known format is in the directory path (e.g., /webp/ or /avif/)
+  let currentDirFormat = ''
+  for (const fmt of knownFormats) {
+    if (beforeLastSlash.includes(`/${fmt}/`)) {
+      currentDirFormat = fmt
+      break
+    }
+  }
+
+  if (!currentDirFormat) return url
+
+  // Skip if already target format
+  if (currentDirFormat.toLowerCase() === targetFormat.toLowerCase()) {
+    return url
+  }
+
+  // Replace directory format
+  const newUrl = url.replace(`/${currentDirFormat}/`, `/${targetFormat}/`)
+
+  // Replace file extension
+  const extMatch = lastSegment.match(/\.([a-z]+)$/i)
+  if (extMatch) {
+    return newUrl.replace(/\.[a-z]+$/i, `.${targetFormat}`)
+  }
+
+  return newUrl
 }
 
 export async function GET(request: NextRequest) {
