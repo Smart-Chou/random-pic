@@ -1,39 +1,156 @@
-# Random-Images
+# Random Pic API
 
-通过随机发送 `url.csv` 文件中给出的图床链接来实现一个随机图片 API  
+A modern random image API built with Next.js 15, TypeScript, and Zod.
 
-## 使用说明
+## Tech Stack
 
-### env
+- **Next.js 15** - App Router, Route Handlers
+- **TypeScript** - Full type safety
+- **Zod** - Schema validation
+- **Vitest** - Testing
 
-在 vercel 中设置环境变量 `BASE_URL`，如 `random-zpic.vercel.app`，纯域名。
+## Features
 
-### url.csv
+- `GET /api/random` - Redirect to random image URL
+- `GET /api/random?category=xxx` - Get random image from specific category
+- `GET /api/random?format=json` - Get JSON response
+- `GET /api/img` - Image proxy with compression support
+- `GET /api/categories` - List available categories
+- `GET /api/health` - Health check
 
-`url.csv` 文件中的每一行都是一个图床链接。
+## Getting Started
 
-例如原图片直链是 `https://random-zpic.vercel.app/**/xxx.png`，
+### Install dependencies
 
-只需粘贴 `/**/xxx.png` 就可以了。
+```bash
+npm install
+```
 
-部署前可以用test.php测试一下（有php环境的话）
+### Development
 
-## 演示
+```bash
+npm run dev
+```
 
-- <https://random-zpic.vercel.app/images>
+### Build
 
-> 演示图片来自<https://pic.marxchou.com>
+```bash
+npm run build
+```
 
-## php 部署到 Vercel
+### Start production
 
-fork 后，修改自己仓库的 `url.csv`，然后在 Vercel 平台上导入自己的项目
+```bash
+npm run start
+```
 
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/import/git?s=https%3A%2F%2Fgithub.com%2FSmart-Chou%2FRandom-Images)
+### Test
 
-第一次部署可能不成功，将nodejs版本改成18，再次部署就行(vercel 目前默认20，有点问题)。
+```bash
+npm run test
+```
 
-## 项目参考
+## Data File
 
-- <https://github.com/vercel-community/php>
-- <https://github.com/galnetwen/Random-Image>
-- <https://github.com/YieldRay/Random-Picture/>
+Images are stored in `data/images.json`:
+
+```json
+[
+  {
+    "id": "1",
+    "url": "/images/landscape/webp/xxx.webp",
+    "category": "landscape",
+    "enabled": true,
+    "weight": 1,
+    "tags": []
+  }
+]
+```
+
+## API Examples
+
+### Get random image (redirect)
+
+```http
+GET /api/random
+```
+
+Response: `302 Found` redirect to image URL
+
+### Get random image (JSON)
+
+```http
+GET /api/random?format=json
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "1",
+    "url": "/images/landscape/webp/xxx.webp",
+    "category": "landscape",
+    "tags": []
+  }
+}
+```
+
+### Get random from category
+
+```http
+GET /api/random?category=landscape
+```
+
+### List categories
+
+```http
+GET /api/categories
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "categories": ["landscape"],
+    "total": 1
+  }
+}
+```
+
+### Health check
+
+```http
+GET /api/health
+```
+
+## Deployment
+
+### Vercel (Recommended)
+
+```bash
+npm i -g vercel
+vercel
+```
+
+Or connect your GitHub repository to Vercel.
+
+### Environment Variables
+
+- `IMAGE_BASE_URL` - Base URL for images (optional, for relative URLs)
+
+## Future Extensibility
+
+The codebase is structured to support future expansions:
+
+- **Database**: Prisma + PostgreSQL ready (replace `image-repository.ts`)
+- **Weighted random**: Already implemented in `image-service.ts`
+- **Upload/management**: API routes organized for easy extension
+- **Authentication**: Route handlers ready for middleware
+
+## License
+
+MIT

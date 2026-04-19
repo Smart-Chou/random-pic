@@ -3,3 +3,11 @@
 .env.example
 
 .DS_Store
+node_modules
+
+.next
+
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
