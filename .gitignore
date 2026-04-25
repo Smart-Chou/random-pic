@@ -5,7 +5,7 @@ node_modules
 .claude
 .env
 .env.local
-.env.example
+.env.production.local
 worker/.wrangler
 worker/dist
 worker/node_modules
@@ -18,9 +18,5 @@ logs
 .idea
 .vscode
 images/
-README.md
-LICENSE
-eslint.config.mjs
-.prettierrc
-.node-version
-.editorconfig
+data/*.json
+!data/.gitkeep

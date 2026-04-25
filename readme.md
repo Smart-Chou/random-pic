@@ -1,16 +1,25 @@
 # Random Pic API
 
-Image Service API
+Random Image Service API using Cloudflare Workers + R2
 
 ## Tech Stack
 
-- **Next.js 15** - App Router, Route Handlers
+- **Cloudflare Workers** - API Server
+- **Cloudflare R2** - Image Storage
+- **Cloudflare KV** - Image Index Storage
 - **TypeScript** - Full type safety
-- **Cloudflare R2** - Image storage (hidden behind proxy)
 
 ## Quick Start
 
-### 1. Setup Environment Variables
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/MIFSH/random-pic.git
+cd random-pic
+pnpm install
+```
+
+### 2. Configure Environment
 
 ```bash
 cp .env.example .env
@@ -18,134 +27,131 @@ cp .env.example .env
 
 Edit `.env` with your credentials:
 
-| Variable         | Description           | Required |
-| ---------------- | --------------------- | -------- |
-| `IMAGE_BASE_URL` | R2 custom domain      | Yes      |
+| Variable              | Description              | Required |
+| --------------------- | ------------------------ | -------- |
+| `R2_ACCOUNT_ID`      | Cloudflare R2 Account ID | Yes      |
+| `AWS_ACCESS_KEY_ID`   | R2 S3 Access Key        | Yes      |
+| `AWS_SECRET_ACCESS_KEY` | R2 S3 Secret Key      | Yes      |
+| `R2_BUCKET`           | R2 bucket name         | Yes      |
 
-Optional variables:
+Optional:
 
-| Variable              | Description              | Default |
-| --------------------- | ------------------------ | ------- |
-| `REFERER_WHITELIST`   | Allowed referers         | -       |
-| `R2_ACCOUNT_ID`      | Cloudflare R2 Account ID| -       |
-| `R2_BUCKET`          | R2 bucket name           | -       |
-| `R2_ACCESS_KEY`      | R2 Access Key            | -       |
-| `R2_SECRET_KEY`      | R2 Secret Key            | -       |
+| Variable            | Description          | Default |
+| ----------------- | -------------------- | ------- |
+| `REFERER_WHITELIST` | Allowed referers     | -       |
+| `IMAGE_BASE_URL`    | R2 custom domain    | -       |
 
-### 2. Start
+### 3. Deploy Worker
 
 ```bash
-pnpm install
-pnpm dev
+npx wrangler deploy
 ```
-
-Visit http://localhost:3000
 
 ## API Endpoints
 
-| Endpoint                   | Description     |
-| -------------------------- | --------------- |
-| `/api/random`              | Random image    |
-| `/api/random?format=json`  | JSON response   |
-| `/api/random?category=xxx` | By category     |
-| `/api/categories`          | List categories |
-| `/api/pic/[path]`          | Proxy image     |
+| Endpoint                   | Description          |
+| ------------------------ | -------------------- |
+| `/api/random`            | Random image stream   |
+| `/api/random?format=json`| JSON response       |
+| `/api/random?category=xxx`| By category         |
+| `/api/pic/path`         | Image proxy         |
+| `/api/categories`       | List categories    |
+| `/api/health`          | Health check      |
 
 ## Usage Examples
 
-### Random Image
-
 ```bash
-# HTML (recommended)
+# HTML - Random Image
 <img src="https://your-domain.com/api/random" />
 
-# JSON response
+# JSON Response
 curl "https://your-domain.com/api/random?format=json"
+# {"success":true,"data":{"url":"/api/pic/...","category":"landscape"}}
 
-# With category
+# By Category
 curl "https://your-domain.com/api/random?category=landscape"
+
+# Direct Image URL
+<img src="/api/pic/meitu/landscape/xxx.jpg" />
+
+# Skip Referer Check (for background images)
+<img src="/api/random?bg=true" />
 ```
 
 ## Features
 
 - [x] Category Management
 - [x] Weighted Random Selection
-- [x] Background Image Mode (?bg=true)
+- [x] Background Image Mode (`?bg=true`)
 - [x] Referer Hotlink Protection
-- [x] CORS Support
-- [x] Hidden Storage Domain (all traffic through proxy)
+- [x] Format Negotiation (AVIF/WebP/JPG)
+- [x] Hidden Storage Domain
 
-### Weighted Random Selection
+## Scripts
 
-Images can have a `weight` field to control selection probability. Higher weight = higher chance:
-
-```json
-{
-  "id": "1",
-  "url": "/path/to/image.webp",
-  "weight": 10
-}
-```
-
-### Background Image Mode
-
-Use `?bg=true` to skip referer validation for CSS background images:
-
-```html
-<img src="https://your-domain.com/api/random?bg=true" />
-```
-
-## Testing
+### Upload Images
 
 ```bash
-pnpm test
+# Upload images from local directory
+./scripts/sync-images.sh ./images meitu landscape jpg,avif,webp
+```
+
+Options: `jpg`, `avif`, `webp` (comma separated)
+
+### Fetch Image Index
+
+```bash
+# Generate images.json from R2
+./scripts/fetch-images.sh
+```
+
+### Sync to KV
+
+```bash
+# Sync images.json to KV
+pnpm sync:kv
 ```
 
 ## Deployment
 
-### Vercel
+### Cloudflare Dashboard
 
-```bash
-pnpm build
-vercel deploy
+1. **Workers** → Create Worker
+2. **KV** → Create namespace `images`
+3. **R2** → Create bucket
+4. **Settings** → Add bindings:
+   - KV: `IMAGES`
+   - R2: `R2`
+5. Deploy with `wrangler deploy`
+
+### Environment Variables
+
+In Dashboard **Settings** → **Environment Variables**:
+
 ```
-
-### Cloudflare Workers
-
-```bash
-cd worker
-pnpm build
-wrangler deploy
-```
-
-### Local
-
-```bash
-pnpm dev
-```
-
-## Environment Variables
-
-```bash
-# R2 Configuration
-R2_ACCOUNT_ID=your_account_id
-R2_BUCKET=blog-all
-R2_ACCESS_KEY=your_access_key
-
-# R2 Custom Domain (used internally, not exposed)
-IMAGE_BASE_URL=your-bucket.example.com
-
-# Referer Whitelist
 REFERER_WHITELIST=example.com,localhost
+IMAGE_BASE_URL=your-bucket.example.com
+```
+
+## Data Format
+
+```json
+{
+  "id": 1,
+  "name": "xxx",
+  "hash": "abc12345",
+  "url": "/meitu/landscape/xxx-abc12345",
+  "category": "landscape",
+  "enabled": true,
+  "weight": 1
+}
 ```
 
 ## Security
 
-All image URLs are proxied through the application domain. The storage bucket domain is never exposed to end users.
-
-- `/api/random` → streams image (no URL visible)
-- `/api/random?format=json` → returns `/api/pic/...` path
-- `/api/pic/[path]` → streams from storage
+- Images are proxied through Worker (R2 URL hidden)
+- Referer whitelist protection
+- Immutable cache headers
 
 ## License
 
