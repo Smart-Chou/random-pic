@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "pic-api",
+  "name": "random-pic",
   "main": "worker/src/index.ts",
   "assets": {
     "binding": "ASSETS",
@@ -20,9 +20,5 @@
       "preview_bucket_name": "blog-all",
       "bucket_name": "blog-all"
     }
-  ],
-  "vars": {
-    "REFERER_WHITELIST": "marxchou.com,localhost",
-    "IMAGE_BASE_URL": "s3.marxchou.com"
-  }
+  ]
 }
