@@ -1,74 +1,112 @@
 #!/usr/bin/env bash
 # ============================================================
 # 从 R2 拉取图片索引
-# 使用方法: ./scripts/fetch-images.sh
-# 需要配置 .env 文件中的 AWS credentials
 # ============================================================
 set -euo pipefail
 
-# 加载环境变量
 [[ -f .env ]] && { set -a; source .env; set +a; }
 
-R2_ACCOUNT_ID="${R2_ACCOUNT_ID:-}"
 R2_BUCKET="${R2_BUCKET:-blog-all}"
 ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 OUTPUT_FILE="data/images.json"
 
-# 检查必要变量
 [[ -z "$R2_ACCOUNT_ID" ]] && { echo "❌ R2_ACCOUNT_ID required"; exit 1; }
 [[ -z "$AWS_ACCESS_KEY_ID" ]] && { echo "❌ AWS_ACCESS_KEY_ID required"; exit 1; }
 [[ -z "$AWS_SECRET_ACCESS_KEY" ]] && { echo "❌ AWS_SECRET_ACCESS_KEY required"; exit 1; }
 
 echo "📥 Fetching images from R2..."
 
-# List .jpg files
-JPG_KEYS=$(aws s3api list-objects \
+# 临时文件
+MEITU_TMP="/tmp/meitu_$$.json"
+TRAVEL_TMP="/tmp/travel_$$.json"
+trap 'rm -f $MEITU_TMP $TRAVEL_TMP' EXIT
+
+# 拉取数据
+aws s3api list-objects-v2 \
   --bucket "$R2_BUCKET" \
   --endpoint-url "$ENDPOINT" \
   --prefix "meitu/" \
-  --query "Contents[?ends_with(Key, '.jpg')].Key" \
-  --output text 2>/dev/null) || true
+  --output json > "$MEITU_TMP" 2>/dev/null
 
-if [[ -z "$JPG_KEYS" ]]; then
-  echo "❌ No images found"
-  exit 1
-fi
+aws s3api list-objects-v2 \
+  --bucket "$R2_BUCKET" \
+  --endpoint-url "$ENDPOINT" \
+  --prefix "travel/" \
+  --output json > "$TRAVEL_TMP" 2>/dev/null
 
-# Convert tabs to newlines
-echo "$JPG_KEYS" | tr '\t' '\n' > /tmp/jpg_keys.txt
+python3 << 'PYEOF'
+import json
+import re
+import glob
 
-echo "[" > "$OUTPUT_FILE"
-FIRST=true
-ID=1
+groups = {}
 
-while read -r KEY; do
-  [[ -z "$KEY" ]] && continue
-  [[ ! "$KEY" =~ \.jpg$ ]] && continue
+for tmp_file in glob.glob('/tmp/meitu_*.json') + glob.glob('/tmp/travel_*.json'):
+    with open(tmp_file) as f:
+        data = json.load(f)
+        for obj in data.get('Contents', []):
+            key = obj.get('Key', '')
+            if not re.match(r'.*\.(jpg|webp|avif)$', key):
+                continue
 
-  CATEGORY=$(echo "$KEY" | cut -d'/' -f2)
-  BASENAME=$(basename "$KEY" .jpg)
-  NAME="${BASENAME%????????}"
-  HASH="${BASENAME##*-}"
-  URL="/${KEY%.jpg}"
+            size = int(obj.get('Size', 0))
+            ext = key.split('.')[-1]
+            parts = key.split('/')
+            prefix = parts[0]  # meitu 或 travel
+            folder = parts[1] if len(parts) > 1 else ''
 
-  [[ "$FIRST" == "true" ]] || echo "," >> "$OUTPUT_FILE"
-  FIRST=false
+            basename = parts[-1]
+            match = re.match(r'^(.+)-(\w{8})\.(jpg|webp|avif)$', basename)
+            if match:
+                name = match.group(1)
+            else:
+                name = re.sub(r'\.(jpg|webp|avif)$', '', basename)
 
-  cat >> "$OUTPUT_FILE" <<JSON
-  {
-    "id": $ID,
-    "name": "$NAME",
-    "hash": "$HASH",
-    "url": "$URL",
-    "category": "$CATEGORY",
-    "enabled": true,
-    "weight": 1,
-    "tags": []
-  }
-JSON
+            # 用 R2 key 构建 group_key 和 r2_url_path
+            group_key = f"{prefix}/{folder}/{name}"
+            r2_url_path = f"{prefix}/{folder}/{name}"
+            if group_key not in groups:
+                groups[group_key] = {
+                    'name': name,
+                    'folder': folder,
+                    'prefix': prefix,
+                    'r2_url_path': r2_url_path,
+                    'formats': {}
+                }
 
-  ID=$((ID + 1))
-done < /tmp/jpg_keys.txt
+            groups[group_key]['formats'][ext] = {
+                'url': f"https://s3.marxchou.com/{key}",
+                'size': size
+            }
 
-echo "]" >> "$OUTPUT_FILE"
-echo "✅ Generated: $OUTPUT_FILE ($((ID - 1)) images)"
+# 排序
+sorted_keys = sorted(groups.keys())
+
+images = []
+for i, key in enumerate(sorted_keys, 1):
+    g = groups[key]
+    webp_url = g['formats'].get('webp', {}).get('url', '')
+    hash_str = ''
+    if webp_url:
+        match = re.search(r'-(\w{8})\.', webp_url)
+        if match:
+            hash_str = match.group(1)
+
+    images.append({
+        'id': i,
+        'name': g['name'],
+        'hash': hash_str,
+        'url': '/' + g['r2_url_path'] + '-' + hash_str,
+        'category': g['folder'],
+        'enabled': True,
+        'weight': 1,
+        'tags': []
+    })
+
+output = images  # 直接输出数组
+
+with open('data/images.json', 'w', encoding='utf-8') as f:
+    json.dump(output, f, ensure_ascii=False, indent=2)
+
+print(f"✅ Generated: data/images.json ({len(images)} images)")
+PYEOF
