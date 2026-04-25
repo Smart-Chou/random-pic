@@ -107,6 +107,7 @@ upload_s3() {
 
 process_image() {
   local file="$1"
+  local rel_path="$2"
   local base ext name jpg_file
   base=$(basename "$file")
   ext="${file##*.}"
@@ -119,7 +120,8 @@ process_image() {
   local hash
   hash=$(hash_file "$file")
   local safe_name="${name}-${hash}"
-  local r2_path="${ROOT_FOLDER}/${CATEGORY}"
+  # 保持子文件夹结构：ROOT_FOLDER/子文件夹/
+  local r2_path="${ROOT_FOLDER}/${rel_path}"
 
   echo "🔄 $base (${size_kb}KB, hash=${hash})"
 
@@ -175,7 +177,11 @@ done
 
 COUNT=0
 while IFS= read -r file; do
-  process_image "$file"
+  # 计算相对于 SOURCE_DIR 的子文件夹路径
+  rel_path="${file#$SOURCE_DIR/}"
+  rel_path="${rel_path%/*}"
+  [[ "$rel_path" == "$file" ]] && rel_path=""
+  process_image "$file" "$rel_path"
   COUNT=$((COUNT + 1))
 done < <(find "$SOURCE_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \))
 
