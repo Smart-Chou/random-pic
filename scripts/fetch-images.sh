@@ -1,111 +1,73 @@
-#!/bin/bash
-# -------------------------------
-# Sync image list from R2 to local data/images.json
-# -------------------------------
+#!/usr/bin/env bash
+# ============================================================
+# 从 R2 拉取图片索引（适配新结构：hash 命名）
+# ============================================================
+set -euo pipefail
 
-set -e
+[[ -f .env ]] && { set -a; source .env; set +a; }
 
-# -------- Config --------
-# Load environment variables
-if [[ -f .env ]]; then
-    set -a
-    source .env
-    set +a
-fi
-
-R2_ACCOUNT_ID="${R2_ACCOUNT_ID:-YOUR_ACCOUNT_ID}"
+R2_ACCOUNT_ID="${R2_ACCOUNT_ID:-}"
 R2_BUCKET="${R2_BUCKET:-pic}"
-R2_ACCESS_KEY="${R2_ACCESS_KEY}"
-R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-
-# Image base URL
+AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
+AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
+ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 IMAGE_BASE_URL="${IMAGE_BASE_URL:-}"
-
-# Output file
 OUTPUT_FILE="${1:-data/images.json}"
 
-# -------- Verify Token --------
-echo "📥 Fetching image list from R2..."
+echo "📥 Fetching images from R2..."
 
-# Verify token first
-TOKEN_CHECK=$(curl -s -w "\n%{http_code}" "https://api.cloudflare.com/client/v4/user/tokens/verify" \
-    -H "Authorization: Bearer ${R2_ACCESS_KEY}")
+# List only .jpg files as primary index (original quality)
+JPG_KEYS=$(aws s3api list-objects \
+  --bucket "$R2_BUCKET" \
+  --endpoint-url "$ENDPOINT" \
+  --prefix "meitu/" \
+  --query "Contents[?ends_with(Key, '.jpg')].Key" \
+  --output text 2>/dev/null) || true
 
-HTTP_CODE=$(echo "$TOKEN_CHECK" | tail -1)
-TOKEN_BODY=$(echo "$TOKEN_CHECK" | sed '$d')
+[[ -z "$JPG_KEYS" ]] && { echo "❌ No images found"; exit 1; }
 
-if [[ "$HTTP_CODE" != "200" ]]; then
-    echo "❌ Token verification failed: $TOKEN_BODY"
-    exit 1
-fi
-
-echo "✅ Token verified"
-
-# List objects via Cloudflare API
-LIST_RESPONSE=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects" \
-    -H "Authorization: Bearer ${R2_ACCESS_KEY}")
-
-# Check if request succeeded
-if ! echo "$LIST_RESPONSE" | grep -q '"success":true'; then
-    echo "❌ Failed to list objects: $LIST_RESPONSE"
-    exit 1
-fi
-
-echo "✅ Retrieved object list"
-
-# -------- Generate JSON --------
 echo "[" > "$OUTPUT_FILE"
-
-# Extract object keys from JSON response
-# Cloudflare API returns: {"success":true,"result":{"objects":[{"key":"path/to/image.webp",...}]}}
-OBJECT_KEYS=$(echo "$LIST_RESPONSE" | grep -o '"key":"[^"]*"' | grep -o '[^"]*$' || true)
-
-if [[ -z "$OBJECT_KEYS" ]]; then
-    echo "❌ No objects found in bucket"
-    exit 1
-fi
-
-ID=1
 FIRST=true
+ID=1
 
-while IFS= read -r KEY; do
-    # Only process image files
-    if [[ "$KEY" =~ \.(webp|jpg|jpeg|png)$ ]]; then
-        # Build URL
-        if [[ -n "$IMAGE_BASE_URL" ]]; then
-            URL="https://$IMAGE_BASE_URL/$KEY"
-        else
-            URL="/$KEY"
-        fi
+echo "$JPG_KEYS" | while read -r KEY; do
+  [[ -z "$KEY" ]] && continue
 
-        # Extract category from path
-        CATEGORY=$(echo "$KEY" | cut -d'/' -f1)
-        if [[ -z "$CATEGORY" || "$CATEGORY" == "$KEY" ]]; then
-            CATEGORY="default"
-        fi
+  # Extract parts: meitu/category/name-hash.jpg
+  local category name hash
+  category=$(echo "$KEY" | cut -d'/' -f2)
+  local basename
+  basename=$(basename "$KEY" .jpg)
 
-        # Generate JSON entry
-        if [[ "$FIRST" == "true" ]]; then
-            FIRST=false
-        else
-            echo "," >> "$OUTPUT_FILE"
-        fi
+  # Split name and hash: last 8 chars is hash
+  name="${basename%????????}"
+  hash="${basename##*-}"
 
-        cat >> "$OUTPUT_FILE" <<EOF
+  # Build URL (use jpg as main format)
+  if [[ -n "$IMAGE_BASE_URL" ]]; then
+    url="https://${IMAGE_BASE_URL}/${KEY%.jpg}"
+  else
+    url="/${KEY%.jpg}"
+  fi
+
+  [[ "$FIRST" == "true" ]] || echo "," >> "$OUTPUT_FILE"
+  FIRST=false
+
+  cat >> "$OUTPUT_FILE" <<JSON
   {
-    "id": "$ID",
-    "url": "$URL",
-    "category": "$CATEGORY",
+    "id": $ID,
+    "name": "$name",
+    "hash": "$hash",
+    "url": "$url",
+    "category": "$category",
     "enabled": true,
     "weight": 1,
     "tags": []
   }
-EOF
+JSON
 
-        ID=$((ID + 1))
-    fi
-done <<< "$OBJECT_KEYS"
+  ID=$((ID + 1))
+done
 
 echo "]" >> "$OUTPUT_FILE"
-
-echo "✅ Generated $OUTPUT_FILE, $((ID - 1)) images"
+echo "✅ Generated: $OUTPUT_FILE ($((ID - 1)) images)"

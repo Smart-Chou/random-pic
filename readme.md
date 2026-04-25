@@ -18,10 +18,19 @@ cp .env.example .env
 
 Edit `.env` with your credentials:
 
-| Variable            | Description      | Required |
-| ------------------- | ---------------- | -------- |
-| `IMAGE_BASE_URL`    | R2 custom domain | Yes      |
-| `REFERER_WHITELIST` | Allowed referers | No       |
+| Variable         | Description           | Required |
+| ---------------- | --------------------- | -------- |
+| `IMAGE_BASE_URL` | R2 custom domain      | Yes      |
+
+Optional variables:
+
+| Variable              | Description              | Default |
+| --------------------- | ------------------------ | ------- |
+| `REFERER_WHITELIST`   | Allowed referers         | -       |
+| `R2_ACCOUNT_ID`      | Cloudflare R2 Account ID| -       |
+| `R2_BUCKET`          | R2 bucket name           | -       |
+| `R2_ACCESS_KEY`      | R2 Access Key            | -       |
+| `R2_SECRET_KEY`      | R2 Secret Key            | -       |
 
 ### 2. Start
 
@@ -60,9 +69,37 @@ curl "https://your-domain.com/api/random?category=landscape"
 ## Features
 
 - [x] Category Management
+- [x] Weighted Random Selection
+- [x] Background Image Mode (?bg=true)
 - [x] Referer Hotlink Protection
 - [x] CORS Support
 - [x] Hidden Storage Domain (all traffic through proxy)
+
+### Weighted Random Selection
+
+Images can have a `weight` field to control selection probability. Higher weight = higher chance:
+
+```json
+{
+  "id": "1",
+  "url": "/path/to/image.webp",
+  "weight": 10
+}
+```
+
+### Background Image Mode
+
+Use `?bg=true` to skip referer validation for CSS background images:
+
+```html
+<img src="https://your-domain.com/api/random?bg=true" />
+```
+
+## Testing
+
+```bash
+pnpm test
+```
 
 ## Deployment
 
@@ -71,6 +108,14 @@ curl "https://your-domain.com/api/random?category=landscape"
 ```bash
 pnpm build
 vercel deploy
+```
+
+### Cloudflare Workers
+
+```bash
+cd worker
+pnpm build
+wrangler deploy
 ```
 
 ### Local
