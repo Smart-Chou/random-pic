@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
     const image = await getRandomImage({category})
 
     if (!image) {
-      // Fallback image
       return NextResponse.redirect('/nico.gif', 302)
     }
 
@@ -47,7 +46,7 @@ export async function GET(request: NextRequest) {
         success: true,
         data: {
           id: image.id,
-          url: image.url,
+          url: `/api/pic${image.url}`,
           category: image.category,
           tags: image.tags,
         },
@@ -72,7 +71,6 @@ export async function GET(request: NextRequest) {
     } catch (fetchError) {
       clearTimeout(timeoutId)
       console.error('R2 fetch error, falling back to redirect:', fetchError)
-      // Fallback to redirect on proxy failure
       return NextResponse.redirect(imageUrl, 302)
     }
     clearTimeout(timeoutId)
@@ -92,7 +90,6 @@ export async function GET(request: NextRequest) {
     if (cacheControl) headers.set('cache-control', cacheControl)
     else headers.set('cache-control', 'public, max-age=86400')
 
-    // Stream image content
     const body = r2Response.body
     if (!body) {
       return new NextResponse('Image not found', {status: 404})

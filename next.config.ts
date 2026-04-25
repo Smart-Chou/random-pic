@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: process.env.IMAGE_HOSTNAME || 'pic-api.example.com',
+        hostname: process.env.IMAGE_HOSTNAME || 'your-image-api.example.com',
         pathname: '/**',
       },
     ],
