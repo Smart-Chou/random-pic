@@ -7,13 +7,13 @@ export default {
     const url = new URL(request.url)
     const path = url.pathname
 
-    // CORS headers
+    // CORS
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept, Referer',
         },
       })
     }
@@ -23,26 +23,30 @@ export default {
       if (path === '/api/random' || path.startsWith('/api/random')) {
         return getRandomImage(request, env)
       }
-      if (path === '/api/img' || path.startsWith('/api/img')) {
+      if (path === '/api/pic' || path.startsWith('/api/pic')) {
         return getImageById(request, env)
       }
       if (path === '/api/categories' || path.startsWith('/api/categories')) {
         return getCategories(request, env)
       }
       if (path === '/api/health' || path.startsWith('/api/health')) {
-        return new Response(JSON.stringify({success: true, data: {status: 'ok'}}), {
-          headers: {'Content-Type': 'application/json'},
-        })
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {status: 'ok', timestamp: new Date().toISOString()},
+          }),
+          {headers: {'Content-Type': 'application/json'}}
+        )
       }
 
-      // Serve static assets
+      // Fallback to static assets
       return env.ASSETS.fetch(request)
     } catch (err) {
       console.error(err)
       return new Response(
         JSON.stringify({
           success: false,
-          error: {code: 'INTERNAL_ERROR', message: err.message},
+          error: {code: 'INTERNAL_ERROR', message: String(err)},
         }),
         {status: 500, headers: {'Content-Type': 'application/json'}}
       )
@@ -54,4 +58,7 @@ export interface Env {
   R2: R2Bucket
   IMAGES: KVNamespace
   ASSETS: Fetcher
+  // Environment variables
+  REFERER_WHITELIST?: string
+  IMAGE_BASE_URL?: string
 }

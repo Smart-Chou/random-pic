@@ -4,25 +4,25 @@
   "main": "worker/src/index.ts",
   "assets": {
     "binding": "ASSETS",
-    "directory": "worker/public",
+    "directory": "worker/public"
   },
   "compatibility_date": "2025-04-19",
   "compatibility_flags": ["nodejs_compat"],
   "kv_namespaces": [
     {
       "binding": "IMAGES",
-      "id": "YOUR_KV_NAMESPACE_ID",
-    },
+      "id": "YOUR_KV_NAMESPACE_ID"
+    }
   ],
   "r2_buckets": [
     {
       "binding": "R2",
-      "preview_bucket_name": "pic",
-      "bucket_name": "pic",
-    },
+      "preview_bucket_name": "blog-all",
+      "bucket_name": "blog-all"
+    }
   ],
-  // "triggers": {
-  //   "crons": ["0 0 * * *"],
-  // },
-  // Note: crons config is used for scheduled workers (Workers Cron Triggers)
+  "vars": {
+    "REFERER_WHITELIST": "marxchou.com,localhost",
+    "IMAGE_BASE_URL": "s3.marxchou.com"
+  }
 }

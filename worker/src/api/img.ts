@@ -26,19 +26,32 @@ export async function getImageById(request: Request, env: EnvExtended): Promise<
     return new Response('Image not found', {status: 404})
   }
 
-  // Proxy mode: fetch from R2
-  const objectKey = image.url.slice(1)
-  const r2Object = await env.R2.get(objectKey)
+  // Format negotiation
+  const accept = request.headers.get('Accept') || ''
+  const formats = accept.includes('image/avif')
+    ? ['avif', 'webp', 'jpg']
+    : accept.includes('image/webp')
+    ? ['webp', 'jpg']
+    : ['jpg', 'webp']
 
-  if (!r2Object) {
+  const objectKey = image.url.slice(1)
+  let imageObject = null
+  for (const ext of formats) {
+    imageObject = await env.R2.get(`${objectKey}.${ext}`)
+    if (imageObject) break
+  }
+
+  if (!imageObject) {
     return new Response('Image not found', {status: 404})
   }
 
+  const contentType = imageObject.httpMetadata.contentType || `image/${formats[0]}`
   const headers = new Headers()
-  headers.set('Content-Type', r2Object.httpMetadata.contentType || 'image/webp')
-  headers.set('Cache-Control', 'public, max-age=31536000')
+  headers.set('Content-Type', contentType)
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+  headers.set('Vary', 'Accept')
 
-  return new Response(r2Object.body, {
+  return new Response(imageObject.body, {
     status: 200,
     headers,
   })

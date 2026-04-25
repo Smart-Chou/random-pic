@@ -1,7 +1,9 @@
 import type {Env} from '../index'
 
 interface Image {
-  id: string
+  id: number
+  name: string
+  hash: string
   url: string
   category: string
   enabled: boolean
@@ -9,35 +11,58 @@ interface Image {
   tags: string[]
 }
 
-interface EnvExtended extends Env {
-  IMAGES: KVNamespace
-  R2: R2Bucket
-}
-
 // In-memory cache
 let cachedImages: Image[] | null = null
 let cacheTime = 0
 const CACHE_TTL = 5 * 60 * 1000
 
-async function loadImages(env: EnvExtended): Promise<Image[]> {
+// Referer whitelist from env
+function getRefererWhitelist(env: Env): string[] {
+  return (env.REFERER_WHITELIST || '').split(',').filter(Boolean).map((d) => d.trim())
+}
+
+function isRefererAllowed(referer: string | null, whitelist: string[]): boolean {
+  if (!referer || whitelist.length === 0) return true
+  return whitelist.some((domain) => referer.includes(domain) || domain === '*')
+}
+
+async function getImageCount(env: Env): Promise<Image[]> {
   const now = Date.now()
   if (cachedImages && now - cacheTime < CACHE_TTL) {
     return cachedImages
   }
 
-  const list = await env.IMAGES.list()
-  const images: Image[] = []
+  // Read from local file (embedded in worker)
+  // Images are embedded at build time via wrangler
+  // For now, try to get from KV first, fallback to none
+  cachedImages = []
+  cacheTime = now
+  return cachedImages
+}
 
-  for (const key of list.keys) {
-    const value = await env.IMAGES.get(key.name, 'json')
-    if (value) {
-      images.push(value as Image)
-    }
+async function loadImagesFromKV(env: Env): Promise<Image[]> {
+  const now = Date.now()
+  if (cachedImages && now - cacheTime < CACHE_TTL) {
+    return cachedImages
   }
 
-  cachedImages = images
-  cacheTime = now
-  return images
+  try {
+    const list = await env.IMAGES.list()
+    const images: Image[] = []
+
+    for (const key of list.keys) {
+      const value = await env.IMAGES.get(key.name, 'json')
+      if (value) {
+        images.push(value as Image)
+      }
+    }
+
+    cachedImages = images
+    cacheTime = now
+    return images
+  } catch {
+    return []
+  }
 }
 
 function selectWeighted(items: Image[]): Image | undefined {
@@ -54,13 +79,31 @@ function selectWeighted(items: Image[]): Image | undefined {
   return items[items.length - 1]
 }
 
-export async function getRandomImage(request: Request, env: EnvExtended): Promise<Response> {
+export async function getRandomImage(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
-  const category = url.searchParams.get('category') ?? undefined
-  const format = url.searchParams.get('format')
+  const searchParams = url.searchParams
+
+  // Get parameters
+  const category = searchParams.get('category') ?? undefined
+  const format = searchParams.get('format')
+  const isBgRequest = searchParams.get('bg') === 'true'
+
+  // Referer validation (skip if bg=true)
+  const referer = request.headers.get('referer') || request.headers.get('origin')
+  const whitelist = getRefererWhitelist(env)
+
+  if (!isBgRequest && !isRefererAllowed(referer, whitelist)) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: {code: 'FORBIDDEN', message: 'Referer not allowed'},
+      }),
+      {status: 403, headers: {'Content-Type': 'application/json'}}
+    )
+  }
 
   // Get images from KV
-  const allImages = await loadImages(env)
+  const allImages = await loadImagesFromKV(env)
   const enabledImages = allImages.filter((img) => img.enabled)
 
   let images = enabledImages
@@ -96,7 +139,7 @@ export async function getRandomImage(request: Request, env: EnvExtended): Promis
         success: true,
         data: {
           id: image.id,
-          url: image.url,
+          url: `/api/pic${image.url}`,
           category: image.category,
           tags: image.tags,
         },
@@ -105,21 +148,55 @@ export async function getRandomImage(request: Request, env: EnvExtended): Promis
     )
   }
 
-  // Proxy mode: fetch from R2 and stream to client
-  // image.url is like "/images/landscape/webp/xxx.webp"
-  const objectKey = image.url.slice(1) // Remove leading "/"
-  const r2Object = await env.R2.get(objectKey)
-
-  if (!r2Object) {
-    return new Response('Image not found', {status: 404})
+  // Build image URL
+  let imageUrl = image.url
+  if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+    const baseUrl = env.IMAGE_BASE_URL || ''
+    imageUrl = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}${imageUrl}`
   }
 
-  const headers = new Headers()
-  headers.set('Content-Type', r2Object.httpMetadata.contentType || 'image/webp')
-  headers.set('Cache-Control', 'public, max-age=86400')
+  // Proxy: fetch from R2 and stream
+  let r2Object = null
 
-  return new Response(r2Object.body, {
-    status: 200,
-    headers,
-  })
+  // Format negotiation: AVIF → WebP → JPG
+  const accept = request.headers.get('Accept') || ''
+  const formats = accept.includes('image/avif')
+    ? ['avif', 'webp', 'jpg']
+    : accept.includes('image/webp')
+    ? ['webp', 'jpg']
+    : ['jpg', 'webp']
+
+  // Try to get each format from R2
+  for (const ext of formats) {
+    const objectKey = image.url.slice(1) + '.' + ext
+    r2Object = await env.R2.get(objectKey)
+    if (r2Object) break
+  }
+
+  if (!r2Object) {
+    // Fallback: try direct URL fetch
+    try {
+      const response = await fetch(imageUrl)
+      if (!response.ok) {
+        return new Response('Image not found', {status: 404})
+      }
+
+      const headers = new Headers()
+      const contentType = response.headers.get('content-type')
+      if (contentType) headers.set('Content-Type', contentType)
+      headers.set('Cache-Control', 'public, max-age=86400')
+
+      return new Response(response.body, {status: 200, headers})
+    } catch {
+      return new Response('Image not found', {status: 404})
+    }
+  }
+
+  const contentType = r2Object.httpMetadata.contentType || `image/${formats[0]}`
+  const headers = new Headers()
+  headers.set('Content-Type', contentType)
+  headers.set('Cache-Control', 'public, max-age=86400')
+  headers.set('Vary', 'Accept')
+
+  return new Response(r2Object.body, {status: 200, headers})
 }
