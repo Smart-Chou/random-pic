@@ -83,11 +83,18 @@ upload_s3() {
     return 0
   fi
 
+  # Determine content type
+  local ext="${key##*.}"
+  local content_type="image/jpeg"
+  [[ "$ext" == "png" ]] && content_type="image/png"
+  [[ "$ext" == "webp" ]] && content_type="image/webp"
+  [[ "$ext" == "avif" ]] && content_type="image/avif"
+
   for i in {1..3}; do
     if aws s3 cp "$file" "s3://${R2_BUCKET}/${key}" \
       --endpoint-url "$ENDPOINT" \
-      --content-type "image/${key##*.}" \
-      --only-show-errors 2>/dev/null; then
+      --content-type "$content_type" \
+      2>&1; then
       echo "    ✅ Uploaded: $key"
       return 0
     fi

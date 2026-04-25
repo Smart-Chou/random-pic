@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
 # ============================================================
-# 从 R2 拉取图片索引（适配新结构：hash 命名）
+# 从 R2 拉取图片索引
 # ============================================================
 set -euo pipefail
 
-[[ -f .env ]] && { set -a; source .env; set +a; }
+export AWS_ACCESS_KEY_ID="0221a17ba89e61a67e7303e499274a3c"
+export AWS_SECRET_ACCESS_KEY="7f2881bfa613350ea1fa47069242a32c884773f8b987a8dbe07db2a50131d16d"
 
-R2_ACCOUNT_ID="${R2_ACCOUNT_ID:-}"
-R2_BUCKET="${R2_BUCKET:-pic}"
-AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
-AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
+R2_ACCOUNT_ID="06096af32bcdfc655f5076b224b32c00"
+R2_BUCKET="blog-all"
 ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-IMAGE_BASE_URL="${IMAGE_BASE_URL:-}"
-OUTPUT_FILE="${1:-data/images.json}"
+OUTPUT_FILE="data/images.json"
 
 echo "📥 Fetching images from R2..."
 
-# List only .jpg files as primary index (original quality)
+# List .jpg files and convert tab-separated to newlines
 JPG_KEYS=$(aws s3api list-objects \
   --bucket "$R2_BUCKET" \
   --endpoint-url "$ENDPOINT" \
@@ -24,31 +22,27 @@ JPG_KEYS=$(aws s3api list-objects \
   --query "Contents[?ends_with(Key, '.jpg')].Key" \
   --output text 2>/dev/null) || true
 
-[[ -z "$JPG_KEYS" ]] && { echo "❌ No images found"; exit 1; }
+if [[ -z "$JPG_KEYS" ]]; then
+  echo "❌ No images found"
+  exit 1
+fi
+
+# Convert tabs to newlines
+echo "$JPG_KEYS" | tr '\t' '\n' > /tmp/jpg_keys.txt
 
 echo "[" > "$OUTPUT_FILE"
 FIRST=true
 ID=1
 
-echo "$JPG_KEYS" | while read -r KEY; do
+while read -r KEY; do
   [[ -z "$KEY" ]] && continue
+  [[ ! "$KEY" =~ \.jpg$ ]] && continue
 
-  # Extract parts: meitu/category/name-hash.jpg
-  local category name hash
-  category=$(echo "$KEY" | cut -d'/' -f2)
-  local basename
-  basename=$(basename "$KEY" .jpg)
-
-  # Split name and hash: last 8 chars is hash
-  name="${basename%????????}"
-  hash="${basename##*-}"
-
-  # Build URL (use jpg as main format)
-  if [[ -n "$IMAGE_BASE_URL" ]]; then
-    url="https://${IMAGE_BASE_URL}/${KEY%.jpg}"
-  else
-    url="/${KEY%.jpg}"
-  fi
+  CATEGORY=$(echo "$KEY" | cut -d'/' -f2)
+  BASENAME=$(basename "$KEY" .jpg)
+  NAME="${BASENAME%????????}"
+  HASH="${BASENAME##*-}"
+  URL="/${KEY%.jpg}"
 
   [[ "$FIRST" == "true" ]] || echo "," >> "$OUTPUT_FILE"
   FIRST=false
@@ -56,10 +50,10 @@ echo "$JPG_KEYS" | while read -r KEY; do
   cat >> "$OUTPUT_FILE" <<JSON
   {
     "id": $ID,
-    "name": "$name",
-    "hash": "$hash",
-    "url": "$url",
-    "category": "$category",
+    "name": "$NAME",
+    "hash": "$HASH",
+    "url": "$URL",
+    "category": "$CATEGORY",
     "enabled": true,
     "weight": 1,
     "tags": []
@@ -67,7 +61,7 @@ echo "$JPG_KEYS" | while read -r KEY; do
 JSON
 
   ID=$((ID + 1))
-done
+done < /tmp/jpg_keys.txt
 
 echo "]" >> "$OUTPUT_FILE"
 echo "✅ Generated: $OUTPUT_FILE ($((ID - 1)) images)"

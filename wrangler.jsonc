@@ -4,6 +4,12 @@
   "main": "worker/src/index.ts",
   "compatibility_date": "2025-04-19",
   "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    {
+      "binding": "IMAGES",
+      "id": "f38bb246bea84f4199c8e3a9ceea6f24"
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "R2",
