@@ -38,7 +38,8 @@ export default {
         )
       }
 
-      return env.ASSETS.fetch(request)
+      // No assets - return 404
+      return new Response('Not Found', {status: 404})
     } catch (err) {
       console.error(err)
       return new Response(
@@ -55,7 +56,6 @@ export default {
 export interface Env {
   R2: R2Bucket
   IMAGES: KVNamespace
-  ASSETS: Fetcher
   // 从 Cloudflare Settings > Environment Variables 读取
   REFERER_WHITELIST?: string
   IMAGE_BASE_URL?: string
