@@ -1,9 +1,4 @@
-import {
-  getEnabledImages,
-  getImagesByCategory,
-  getCategories,
-  getImageById,
-} from './image-repository'
+import {getEnabledImages, getImagesByCategory, getCategories} from './image-repository'
 import type {ImageWithMeta} from '@/types/image'
 
 /**
@@ -61,4 +56,4 @@ export async function getRandomImage(
   return selectWeighted(images) ?? null
 }
 
-export {getCategories, getImageById}
+export {getCategories}

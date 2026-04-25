@@ -13,15 +13,6 @@
           "value": "GET, OPTIONS"
         }
       ]
-    },
-    {
-      "source": "/api/img",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000"
-        }
-      ]
     }
   ]
 }

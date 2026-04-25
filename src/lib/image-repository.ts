@@ -8,8 +8,6 @@ const DATA_FILE_PATH = 'data/images.json'
 /**
  * Image Repository - Data Access Module
  * Reads image data from local file
- *
- * Reserved for future: Can be replaced with Prisma + PostgreSQL
  */
 
 interface CacheEntry {
@@ -57,11 +55,6 @@ export async function getCategories(): Promise<string[]> {
   const images = await getEnabledImages()
   const categories = new Set(images.map((img) => img.category))
   return Array.from(categories).sort()
-}
-
-export async function getImageById(id: string): Promise<ImageWithMeta | null> {
-  const images = await loadImages()
-  return images.find((img) => img.id === id) ?? null
 }
 
 export function clearCache(): void {

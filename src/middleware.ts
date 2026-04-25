@@ -27,7 +27,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Image protection with referer
-  if (pathname.startsWith('/uploads/') || pathname.startsWith('/meitu/')) {
+  if (pathname.startsWith('/uploads/')) {
     const referer = request.headers.get('referer') || ''
 
     if (REFERER_WHITELIST.length > 0) {

@@ -12,3 +12,12 @@ node_modules
 worker/.wrangler
 worker/dist
 worker/node_modules
+pnpm-lock.yaml
+tsconfig.tsbuildinfo
+dist
+build
+coverage
+logs
+*.log
+.idea
+.vscode
