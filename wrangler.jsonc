@@ -2,6 +2,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "random-pic",
   "main": "worker/src/index.ts",
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "worker/public"
+  },
   "compatibility_date": "2025-04-19",
   "compatibility_flags": ["nodejs_compat"],
   "kv_namespaces": [

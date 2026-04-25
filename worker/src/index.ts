@@ -19,6 +19,7 @@ export default {
     }
 
     try {
+      // API routes
       if (path === '/api/random' || path.startsWith('/api/random')) {
         return getRandomImage(request, env)
       }
@@ -38,8 +39,8 @@ export default {
         )
       }
 
-      // No assets - return 404
-      return new Response('Not Found', {status: 404})
+      // Serve static assets
+      return env.ASSETS.fetch(request)
     } catch (err) {
       console.error(err)
       return new Response(
@@ -56,7 +57,5 @@ export default {
 export interface Env {
   R2: R2Bucket
   IMAGES: KVNamespace
-  // 从 Cloudflare Settings > Environment Variables 读取
-  REFERER_WHITELIST?: string
-  IMAGE_BASE_URL?: string
+  ASSETS: Fetcher
 }
