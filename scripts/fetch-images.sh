@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
 # ============================================================
 # 从 R2 拉取图片索引
+# 使用方法: ./scripts/fetch-images.sh
+# 需要配置 .env 文件中的 AWS credentials
 # ============================================================
 set -euo pipefail
 
-export AWS_ACCESS_KEY_ID="0221a17ba89e61a67e7303e499274a3c"
-export AWS_SECRET_ACCESS_KEY="7f2881bfa613350ea1fa47069242a32c884773f8b987a8dbe07db2a50131d16d"
+# 加载环境变量
+[[ -f .env ]] && { set -a; source .env; set +a; }
 
-R2_ACCOUNT_ID="06096af32bcdfc655f5076b224b32c00"
-R2_BUCKET="blog-all"
+R2_ACCOUNT_ID="${R2_ACCOUNT_ID:-}"
+R2_BUCKET="${R2_BUCKET:-blog-all}"
 ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 OUTPUT_FILE="data/images.json"
 
+# 检查必要变量
+[[ -z "$R2_ACCOUNT_ID" ]] && { echo "❌ R2_ACCOUNT_ID required"; exit 1; }
+[[ -z "$AWS_ACCESS_KEY_ID" ]] && { echo "❌ AWS_ACCESS_KEY_ID required"; exit 1; }
+[[ -z "$AWS_SECRET_ACCESS_KEY" ]] && { echo "❌ AWS_SECRET_ACCESS_KEY required"; exit 1; }
+
 echo "📥 Fetching images from R2..."
 
-# List .jpg files and convert tab-separated to newlines
+# List .jpg files
 JPG_KEYS=$(aws s3api list-objects \
   --bucket "$R2_BUCKET" \
   --endpoint-url "$ENDPOINT" \

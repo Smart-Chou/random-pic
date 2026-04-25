@@ -1,5 +1,5 @@
 import {getRandomImage} from './api/random'
-import {getImageById} from './api/img'
+import {getImageByPath} from './api/img'
 import {getCategories} from './api/categories'
 
 export default {
@@ -24,7 +24,7 @@ export default {
         return getRandomImage(request, env)
       }
       if (path === '/api/pic' || path.startsWith('/api/pic')) {
-        return getImageById(request, env)
+        return getImageByPath(request, env)
       }
       if (path === '/api/categories' || path.startsWith('/api/categories')) {
         return getCategories(request, env)
@@ -39,7 +39,7 @@ export default {
         )
       }
 
-      // Serve static assets
+      // Serve static assets (index.html, favicon, etc.)
       return env.ASSETS.fetch(request)
     } catch (err) {
       console.error(err)
@@ -58,4 +58,7 @@ export interface Env {
   R2: R2Bucket
   IMAGES: KVNamespace
   ASSETS: Fetcher
+  // From Cloudflare Settings > Environment Variables
+  REFERER_WHITELIST?: string
+  IMAGE_BASE_URL?: string
 }

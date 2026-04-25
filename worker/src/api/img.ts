@@ -1,58 +1,53 @@
 import type {Env} from '../index'
-import type {Image} from './random'
 
-interface EnvExtended extends Env {
-  IMAGES: KVNamespace
-  R2: R2Bucket
+interface Image {
+  id: number
+  name: string
+  hash: string
+  url: string
+  category: string
+  enabled: boolean
+  weight: number
+  tags: string[]
 }
 
-export async function getImageById(request: Request, env: EnvExtended): Promise<Response> {
+export async function getImageByPath(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
-  const imageId = url.searchParams.get('id')
+  const pathname = url.pathname
 
-  if (!imageId) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: {code: 'MISSING_ID', message: 'Image ID is required'},
-      }),
-      {status: 400, headers: {'Content-Type': 'application/json'}}
-    )
+  // Parse: /api/pic/meitu/landscape/xxx or /api/pic/meitu/landscape/xxx.webp
+  const imagePath = pathname.replace(/^\/api\/pic/, '')
+
+  if (!imagePath || imagePath === '/') {
+    return new Response('Not found', { status: 404 })
   }
 
-  const image = (await env.IMAGES.get(imageId, 'json')) as Image | null
+  // Get base path (without extension)
+  const basePath = imagePath.replace(/^\//, '').replace(/\.(jpg|webp|avif|png|jpeg)$/i, '')
 
-  if (!image) {
-    return new Response('Image not found', {status: 404})
-  }
-
-  // Format negotiation
+  // Format negotiation: AVIF → WebP → JPG
   const accept = request.headers.get('Accept') || ''
   const formats = accept.includes('image/avif')
-    ? ['avif', 'webp', 'jpg']
+    ? ['avif', 'webp', 'jpg', 'png', 'jpeg']
     : accept.includes('image/webp')
-    ? ['webp', 'jpg']
-    : ['jpg', 'webp']
+    ? ['webp', 'jpg', 'png', 'jpeg']
+    : ['jpg', 'png', 'jpeg', 'webp']
 
-  const objectKey = image.url.slice(1)
-  let imageObject = null
+  let r2Object = null
   for (const ext of formats) {
-    imageObject = await env.R2.get(`${objectKey}.${ext}`)
-    if (imageObject) break
+    r2Object = await env.R2.get(`${basePath}.${ext}`)
+    if (r2Object) break
   }
 
-  if (!imageObject) {
-    return new Response('Image not found', {status: 404})
+  if (!r2Object) {
+    return new Response('Image not found', { status: 404 })
   }
 
-  const contentType = imageObject.httpMetadata.contentType || `image/${formats[0]}`
+  const contentType = r2Object.httpMetadata.contentType || 'image/jpeg'
   const headers = new Headers()
   headers.set('Content-Type', contentType)
-  headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+  headers.set('Cache-Control', 'public, max-age=86400')
   headers.set('Vary', 'Accept')
 
-  return new Response(imageObject.body, {
-    status: 200,
-    headers,
-  })
+  return new Response(r2Object.body, { status: 200, headers })
 }

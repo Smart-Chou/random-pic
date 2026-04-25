@@ -18,7 +18,9 @@ const CACHE_TTL = 5 * 60 * 1000
 
 // Referer whitelist from env
 function getRefererWhitelist(env: Env): string[] {
-  return (env.REFERER_WHITELIST || '').split(',').filter(Boolean).map((d) => d.trim())
+  const whitelist = (env.REFERER_WHITELIST || '')
+  if (!whitelist) return []
+  return whitelist.split(',').filter(Boolean).map((d) => d.trim())
 }
 
 function isRefererAllowed(referer: string | null, whitelist: string[]): boolean {
@@ -26,18 +28,9 @@ function isRefererAllowed(referer: string | null, whitelist: string[]): boolean 
   return whitelist.some((domain) => referer.includes(domain) || domain === '*')
 }
 
-async function getImageCount(env: Env): Promise<Image[]> {
-  const now = Date.now()
-  if (cachedImages && now - cacheTime < CACHE_TTL) {
-    return cachedImages
-  }
-
-  // Read from local file (embedded in worker)
-  // Images are embedded at build time via wrangler
-  // For now, try to get from KV first, fallback to none
-  cachedImages = []
-  cacheTime = now
-  return cachedImages
+function getCategoriesFromImages(images: Image[]): string[] {
+  const categories = new Set(images.filter(img => img.enabled).map(img => img.category))
+  return Array.from(categories).sort()
 }
 
 async function loadImagesFromKV(env: Env): Promise<Image[]> {
@@ -79,6 +72,16 @@ function selectWeighted(items: Image[]): Image | undefined {
   return items[items.length - 1]
 }
 
+function errorResponse(code: string, message: string): Response {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: { code, message },
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  )
+}
+
 export async function getRandomImage(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
   const searchParams = url.searchParams
@@ -93,18 +96,20 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
   const whitelist = getRefererWhitelist(env)
 
   if (!isBgRequest && !isRefererAllowed(referer, whitelist)) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: {code: 'FORBIDDEN', message: 'Referer not allowed'},
-      }),
-      {status: 403, headers: {'Content-Type': 'application/json'}}
-    )
+    return errorResponse('FORBIDDEN', 'Referer not allowed')
   }
 
   // Get images from KV
   const allImages = await loadImagesFromKV(env)
   const enabledImages = allImages.filter((img) => img.enabled)
+
+  // Validate category if provided
+  if (category) {
+    const availableCategories = getCategoriesFromImages(allImages)
+    if (!availableCategories.includes(category)) {
+      return errorResponse('CATEGORY_NOT_FOUND', `Category '${category}' not found`)
+    }
+  }
 
   let images = enabledImages
   if (category) {
@@ -112,24 +117,12 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
   }
 
   if (images.length === 0) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: {code: 'NO_IMAGES', message: 'No images available'},
-      }),
-      {status: 404, headers: {'Content-Type': 'application/json'}}
-    )
+    return errorResponse('NO_IMAGES', 'No images available')
   }
 
   const image = selectWeighted(images)
   if (!image) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: {code: 'NO_IMAGE', message: 'Failed to select image'},
-      }),
-      {status: 500, headers: {'Content-Type': 'application/json'}}
-    )
+    return errorResponse('NO_IMAGE', 'Failed to select image')
   }
 
   // Return JSON if requested
@@ -144,7 +137,7 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
           tags: image.tags,
         },
       }),
-      {headers: {'Content-Type': 'application/json'}}
+      { headers: { 'Content-Type': 'application/json' } }
     )
   }
 
@@ -155,10 +148,8 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
     imageUrl = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}${imageUrl}`
   }
 
-  // Proxy: fetch from R2 and stream
-  let r2Object = null
-
   // Format negotiation: AVIF → WebP → JPG
+  let r2Object = null
   const accept = request.headers.get('Accept') || ''
   const formats = accept.includes('image/avif')
     ? ['avif', 'webp', 'jpg']
@@ -166,7 +157,6 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
     ? ['webp', 'jpg']
     : ['jpg', 'webp']
 
-  // Try to get each format from R2
   for (const ext of formats) {
     const objectKey = image.url.slice(1) + '.' + ext
     r2Object = await env.R2.get(objectKey)
@@ -174,11 +164,10 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
   }
 
   if (!r2Object) {
-    // Fallback: try direct URL fetch
     try {
       const response = await fetch(imageUrl)
       if (!response.ok) {
-        return new Response('Image not found', {status: 404})
+        return new Response('Image not found', { status: 404 })
       }
 
       const headers = new Headers()
@@ -186,9 +175,9 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
       if (contentType) headers.set('Content-Type', contentType)
       headers.set('Cache-Control', 'public, max-age=86400')
 
-      return new Response(response.body, {status: 200, headers})
+      return new Response(response.body, { status: 200, headers })
     } catch {
-      return new Response('Image not found', {status: 404})
+      return new Response('Image not found', { status: 404 })
     }
   }
 
@@ -198,5 +187,5 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
   headers.set('Cache-Control', 'public, max-age=86400')
   headers.set('Vary', 'Accept')
 
-  return new Response(r2Object.body, {status: 200, headers})
+  return new Response(r2Object.body, { status: 200, headers })
 }
