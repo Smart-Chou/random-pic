@@ -1,4 +1,4 @@
-[
+export const images = [
   {
     "id": 1,
     "name": "100",
@@ -4119,4 +4119,4 @@
     "weight": 1,
     "tags": []
   }
-]
+];

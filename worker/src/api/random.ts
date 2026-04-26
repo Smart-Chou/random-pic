@@ -1,6 +1,9 @@
 import type { Env } from '../index'
+import { images } from '../data/images'
 
-interface Image {
+export { images }
+
+export interface Image {
   id: number
   name: string
   hash: string
@@ -9,24 +12,6 @@ interface Image {
   enabled: boolean
   weight: number
   tags: string[]
-}
-
-// In-memory cache
-let cachedImages: Image[] | null = null
-
-// Hardcoded fallback
-const FALLBACK: Image[] = [
-  { id: 1, name: "100", hash: "94b8436c", url: "/meitu/anime/100-94b8436c", category: "anime", enabled: true, weight: 1, tags: [] },
-]
-
-async function loadImagesFromUrl(): Promise<Image[]> {
-  if (cachedImages) return cachedImages
-  try {
-    const res = await fetch('https://pic-api.marxchou.com/images.json')
-    if (!res.ok) return FALLBACK
-    cachedImages = await res.json() as Image[]
-    return cachedImages || FALLBACK
-  } catch { return FALLBACK }
 }
 
 function selectWeighted(items: Image[]): Image | undefined {
@@ -53,9 +38,7 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
   const category = searchParams.get('category') ?? undefined
   const format = searchParams.get('format')
 
-  // Get images
-  const allImages = await loadImagesFromUrl()
-  const enabledImages = allImages.filter((img) => img.enabled)
+  const enabledImages = images.filter((img) => img.enabled)
 
   if (category) {
     const categories = new Set(enabledImages.map((img) => img.category))
@@ -64,16 +47,16 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
     }
   }
 
-  let images = enabledImages
+  let filtered = enabledImages
   if (category) {
-    images = enabledImages.filter((img) => img.category === category)
+    filtered = enabledImages.filter((img) => img.category === category)
   }
 
-  if (images.length === 0) {
+  if (filtered.length === 0) {
     return errorResponse('NO_IMAGES', 'No images available')
   }
 
-  const image = selectWeighted(images)
+  const image = selectWeighted(filtered)
   if (!image) {
     return errorResponse('NO_IMAGE', 'Failed to select image')
   }
@@ -88,14 +71,12 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
     )
   }
 
-  // Build image URL
   let imageUrl = image.url
   if (!imageUrl.startsWith('http')) {
-    const baseUrl = env.IMAGE_BASE_URL || 'https://pic-api.marxchou.com'
-    imageUrl = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}${imageUrl}`
+    const baseUrl = env.IMAGE_BASE_URL || ''
+    imageUrl = baseUrl ? `${baseUrl}${imageUrl}` : imageUrl
   }
 
-  // Try R2 first
   let r2Object = null
   const accept = request.headers.get('Accept') || ''
   const formats = accept.includes('image/avif')

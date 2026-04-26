@@ -5,8 +5,7 @@ Random Image Service API using Cloudflare Workers + R2
 ## Tech Stack
 
 - **Cloudflare Workers** - API Server
-- **Cloudflare R2** - Image Storage
-- **Cloudflare KV** - Image Index Storage
+- **Cloudflare R2** - Image Storage (optional)
 - **TypeScript** - Full type safety
 
 ## Quick Start
@@ -39,9 +38,20 @@ Optional:
 | Variable            | Description          | Default |
 | ----------------- | -------------------- | ------- |
 | `REFERER_WHITELIST` | Allowed referers     | -       |
-| `IMAGE_BASE_URL`    | R2 custom domain    | -       |
+| `IMAGE_BASE_URL`    | Image domain        | -       |
 
-### 3. Deploy Worker
+### 3. Update Image Data
+
+Images are stored in `data/images.json`. To update:
+
+```bash
+# Regenerate from local images
+./scripts/fetch-images.sh ./images
+```
+
+This generates `worker/src/data/images.ts` automatically.
+
+### 4. Deploy Worker
 
 ```bash
 npx wrangler deploy
@@ -57,6 +67,7 @@ npx wrangler deploy
 | `/api/pic/path`         | Image proxy         |
 | `/api/categories`       | List categories    |
 | `/api/health`          | Health check      |
+| `/nico.gif`           | Not found image (404) |
 
 ## Usage Examples
 
@@ -66,72 +77,22 @@ npx wrangler deploy
 
 # JSON Response
 curl "https://your-domain.com/api/random?format=json"
-# {"success":true,"data":{"url":"/api/pic/...","category":"landscape"}}
+# {"success":true,"data":{"url":"/api/pic/...","category":"anime"}}
 
 # By Category
-curl "https://your-domain.com/api/random?category=landscape"
+curl "https://your-domain.com/api/random?category=anime"
 
 # Direct Image URL
-<img src="/api/pic/meitu/landscape/xxx.jpg" />
-
-# Skip Referer Check (for background images)
-<img src="/api/random?bg=true" />
+<img src="/api/pic/meitu/anime/xxx.jpg" />
 ```
 
 ## Features
 
 - [x] Category Management
 - [x] Weighted Random Selection
-- [x] Background Image Mode (`?bg=true`)
-- [x] Referer Hotlink Protection
 - [x] Format Negotiation (AVIF/WebP/JPG)
-- [x] Hidden Storage Domain
-
-## Scripts
-
-### Upload Images
-
-```bash
-# Upload images from local directory
-./scripts/sync-images.sh ./images meitu landscape jpg,avif,webp
-```
-
-Options: `jpg`, `avif`, `webp` (comma separated)
-
-### Fetch Image Index
-
-```bash
-# Generate images.json from R2
-./scripts/fetch-images.sh
-```
-
-### Sync to KV
-
-```bash
-# Sync images.json to KV
-pnpm sync:kv
-```
-
-## Deployment
-
-### Cloudflare Dashboard
-
-1. **Workers** → Create Worker
-2. **KV** → Create namespace `images`
-3. **R2** → Create bucket
-4. **Settings** → Add bindings:
-   - KV: `IMAGES`
-   - R2: `R2`
-5. Deploy with `wrangler deploy`
-
-### Environment Variables
-
-In Dashboard **Settings** → **Environment Variables**:
-
-```
-REFERER_WHITELIST=example.com,localhost
-IMAGE_BASE_URL=your-bucket.example.com
-```
+- [x] Referer Hotlink Protection
+- [x] Embedded Image Index (no KV required)
 
 ## Data Format
 
@@ -140,16 +101,22 @@ IMAGE_BASE_URL=your-bucket.example.com
   "id": 1,
   "name": "xxx",
   "hash": "abc12345",
-  "url": "/meitu/landscape/xxx-abc12345",
-  "category": "landscape",
+  "url": "/meitu/anime/xxx-abc12345",
+  "category": "anime",
   "enabled": true,
-  "weight": 1
+  "weight": 1,
+  "tags": []
 }
 ```
 
+## Storage Priority
+
+1. **R2 Bucket** - Checked first
+2. **External URL** - Falls back to `IMAGE_BASE_URL`
+
 ## Security
 
-- Images are proxied through Worker (R2 URL hidden)
+- Images can be proxied through Worker (R2 URL hidden)
 - Referer whitelist protection
 - Immutable cache headers
 
