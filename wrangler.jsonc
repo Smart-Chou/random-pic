@@ -9,18 +9,13 @@
   "compatibility_date": "2025-04-19",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
-    "enabled": false,
+    "enabled": true,
     "head_sampling_rate": 1,
     "logs": {
       "enabled": true,
       "head_sampling_rate": 1,
       "persist": true,
       "invocation_logs": true
-    },
-    "traces": {
-      "enabled": false,
-      "persist": true,
-      "head_sampling_rate": 1
     }
   },
   "r2_buckets": [
@@ -29,5 +24,8 @@
       "preview_bucket_name": "blog-all",
       "bucket_name": "blog-all"
     }
-  ]
+  ],
+  "vars": {
+    "IMAGE_BASE_URL": "https://pic-api.marxchou.com"
+  }
 }
