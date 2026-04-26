@@ -39,6 +39,18 @@ export default {
         )
       }
 
+      // nico.gif - 404 fallback image
+      if (path === '/nico.gif') {
+        const nicoResponse = await env.ASSETS.fetch(new Request('/nico.gif'))
+        if (nicoResponse.ok) {
+          return new Response(nicoResponse.body, {
+            status: 404,
+            headers: { 'Content-Type': 'image/gif' },
+          })
+        }
+        return new Response('Not found', { status: 404 })
+      }
+
       // Serve static assets (index.html, favicon, etc.)
       return env.ASSETS.fetch(request)
     } catch (err) {
@@ -56,7 +68,6 @@ export default {
 
 export interface Env {
   R2: R2Bucket
-  IMAGES: KVNamespace
   ASSETS: Fetcher
   // From Cloudflare Settings > Environment Variables
   REFERER_WHITELIST?: string

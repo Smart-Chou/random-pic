@@ -1,4 +1,4 @@
-import type {Env} from '../index'
+import type { Env } from '../index'
 
 interface Image {
   id: number
@@ -11,10 +11,34 @@ interface Image {
   tags: string[]
 }
 
+interface ImagesData {
+  images: Image[]
+}
+
 // In-memory cache
 let cachedImages: Image[] | null = null
 let cacheTime = 0
 const CACHE_TTL = 5 * 60 * 1000
+
+async function loadImagesFromFile(env: Env): Promise<Image[]> {
+  const now = Date.now()
+  if (cachedImages && now - cacheTime < CACHE_TTL) {
+    return cachedImages
+  }
+
+  try {
+    const response = await env.ASSETS.fetch(new Request('/images.json'))
+    if (!response.ok) {
+      return cachedImages || []
+    }
+    const data: ImagesData = await response.json()
+    cachedImages = data.images
+    cacheTime = now
+    return data.images
+  } catch {
+    return cachedImages || []
+  }
+}
 
 // Referer whitelist from env
 function getRefererWhitelist(env: Env): string[] {
@@ -31,31 +55,6 @@ function isRefererAllowed(referer: string | null, whitelist: string[]): boolean 
 function getCategoriesFromImages(images: Image[]): string[] {
   const categories = new Set(images.filter(img => img.enabled).map(img => img.category))
   return Array.from(categories).sort()
-}
-
-async function loadImagesFromKV(env: Env): Promise<Image[]> {
-  const now = Date.now()
-  if (cachedImages && now - cacheTime < CACHE_TTL) {
-    return cachedImages
-  }
-
-  try {
-    const list = await env.IMAGES.list()
-    const images: Image[] = []
-
-    for (const key of list.keys) {
-      const value = await env.IMAGES.get(key.name, 'json')
-      if (value) {
-        images.push(value as Image)
-      }
-    }
-
-    cachedImages = images
-    cacheTime = now
-    return images
-  } catch {
-    return []
-  }
 }
 
 function selectWeighted(items: Image[]): Image | undefined {
@@ -99,8 +98,8 @@ export async function getRandomImage(request: Request, env: Env): Promise<Respon
     return errorResponse('FORBIDDEN', 'Referer not allowed')
   }
 
-  // Get images from KV
-  const allImages = await loadImagesFromKV(env)
+  // Get images from file
+  const allImages = await loadImagesFromFile(env)
   const enabledImages = allImages.filter((img) => img.enabled)
 
   // Validate category if provided

@@ -1,21 +1,23 @@
-import type {Env} from '../index'
-import type {Image} from './random'
+import type { Env } from '../index'
+import type { Image } from './random'
 
-interface EnvExtended extends Env {
-  IMAGES: KVNamespace
-}
+export async function getCategories(request: Request, env: Env): Promise<Response> {
+  // Fetch images from file via ASSETS
+  const response = await env.ASSETS.fetch(new Request('/images.json'))
+  if (!response.ok) {
+    return new Response(
+      JSON.stringify({ success: false, error: { code: 'NOT_FOUND', message: 'images.json not found' } }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
 
-export async function getCategories(request: Request, env: EnvExtended): Promise<Response> {
-  const list = await env.IMAGES.list()
+  const data = await response.json()
+  const images: Image[] = data.images || []
   const categories = new Set<string>()
 
-  for (const key of list.keys) {
-    const value = await env.IMAGES.get(key.name, 'json')
-    if (value) {
-      const img = value as Image
-      if (img.enabled) {
-        categories.add(img.category)
-      }
+  for (const img of images) {
+    if (img.enabled) {
+      categories.add(img.category)
     }
   }
 

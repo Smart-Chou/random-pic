@@ -23,12 +23,6 @@
       "head_sampling_rate": 1
     }
   },
-  "kv_namespaces": [
-    {
-      "binding": "IMAGES",
-      "id": "f38bb246bea84f4199c8e3a9ceea6f24"
-    }
-  ],
   "r2_buckets": [
     {
       "binding": "R2",
